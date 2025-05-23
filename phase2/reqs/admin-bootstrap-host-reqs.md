@@ -1,0 +1,17 @@
+# Admin/Bootstrap Host (Your Workstation)
+ - ansible
+ - terraform
+ - helm
+ - kubectl
+ - kustomize
+ - jq
+ - yq
+ - gh (GitHub CLI)
+ - git
+ - curl
+ - unzip
+ - virt-manager
+ - virt-viewer
+ - kubernetes-client
+ - k9s
+ - lens (optional GUI)

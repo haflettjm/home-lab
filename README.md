@@ -7,7 +7,7 @@ The project is designed to scale from lightweight workloads to production-grade 
 ---
 
 ## Current Phase:
-### Phase(s): 01-02
+### **Phase(s): 01-02**
 
 ---
 
@@ -42,19 +42,44 @@ The project is designed to scale from lightweight workloads to production-grade 
 
 ```
 home-lab/
-├── ansible/              # System prep & cluster install
-├── terraform/            # App and service deployment
-│   ├── modules/
-│   └── environments/
-├── helm-charts/          # Custom chart configs (NGINX, cert-manager, etc.)
-├── k8s/                  # Base manifests, namespaces, RBAC
-├── scripts/              # Setup and automation scripts
-├── inventory.yaml        # Machine inventory for Ansible
-├── HOME-LAB.md           # Project plan and resource tracking
-└── README.md             # This file
+├── phase1-inventory/         # Hardware discovery, inventory tracking scripts
+│   └── inventory.yaml
+│
+├── phase2-prep/              # OS prep scripts and Ansible roles (SSH, packages, users)
+│   ├── ansible/
+│   └── prep-fedora.sh
+│
+├── phase3-k8s-install/       # K3s install, control plane bootstrap, node joining
+│   ├── k3s-install.yml
+│   └── kubeconfig/
+│
+├── phase4-networking/        # Ingress, MetalLB, DNS, cert-manager
+│   ├── helm-charts/
+│   └── scripts/
+│       └── setup-networking.sh
+│
+├── phase5-apps/              # Terraform modules for application deployment
+│   ├── terraform/
+│   │   ├── modules/
+│   │   └── environments/
+│   └── k8s/apps/
+│
+├── phase6-monitoring/        # Monitoring stack (Prometheus, Grafana, Loki)
+│   └── manifests/
+│
+├── phase7-maintenance/       # Backups, scaling, updates, long-term ops
+│   ├── upgrade-scripts/
+│   └── node-tools/
+│
+├── scripts/                  # Bootstrap wrapper (infra-up.sh, checks, helpers)
+│   └── infra-up.sh
+│
+├── HOME-LAB.md               # Full system plan and status tracker
+└── README.md                 # Top-level project overview
 ```
 
 ---
+
 
 ## 🚀 Getting Started
 

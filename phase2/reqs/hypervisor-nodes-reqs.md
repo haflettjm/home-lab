@@ -1,0 +1,12 @@
+# Hypervisor Nodes (VMs)
+- qemu-kvm
+- libvirt
+- virt-install
+- virt-manager
+- cloud-utils
+- genisoimage
+- bridge-utils
+- libguestfs-tools
+- virt-top
+- virt-viewer
+- spice-server
