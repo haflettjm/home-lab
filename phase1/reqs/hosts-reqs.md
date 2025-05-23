@@ -1,0 +1,11 @@
+# Hosts
+ - qemu-kvm
+ - libvirt
+ - virt-manager
+ - virt-install
+ - bridge-utils
+ - cloud-utils
+ - genisoimage
+ - libguestfs-tools
+ - virt-top
+ - virt-viewer
