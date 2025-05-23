@@ -6,6 +6,11 @@ The project is designed to scale from lightweight workloads to production-grade 
 
 ---
 
+## Current Phase:
+### Phase(s): 01-02
+
+---
+
 ## 📦 Features
 
 - **K3s-based Kubernetes cluster** with optional migration to kubeadm or cloud-managed K8s
@@ -16,6 +21,20 @@ The project is designed to scale from lightweight workloads to production-grade 
 - **Monitoring stack** with Prometheus, Grafana, and Loki
 - **Modular application deployment** via Terraform modules
 - **Planned support** for GitOps, secret management, and remote scaling
+
+---
+
+## 🔁 Project Phases
+
+| Phase | Description |
+|-------|-------------|
+| 1. Inventory Management       | Track machine specs manually or via script. |
+| 2. Infrastructure Preparation | Set up OS, SSH, VM layers, and packages. |
+| 3. Kubernetes Setup           | Bootstrap cluster with K3s. |
+| 4. Networking & Storage       | DNS, Ingress (NGINX), persistent volumes. |
+| 5. App Hosting                | Deploy apps using Terraform. |
+| 6. Monitoring & Observability | Prometheus, Grafana, logging, etc. |
+| 7. Maintenance & Scaling      | Node mgmt, patching, backups, cloud-ready. |
 
 ---
 
@@ -30,7 +49,6 @@ home-lab/
 ├── helm-charts/          # Custom chart configs (NGINX, cert-manager, etc.)
 ├── k8s/                  # Base manifests, namespaces, RBAC
 ├── scripts/              # Setup and automation scripts
-├── phase1/               # Machine Preperation
 ├── inventory.yaml        # Machine inventory for Ansible
 ├── HOME-LAB.md           # Project plan and resource tracking
 └── README.md             # This file
@@ -97,5 +115,5 @@ This project is designed for personal experimentation and practical DevOps learn
 ---
 
 ## 📜 License
-????
 
+????
