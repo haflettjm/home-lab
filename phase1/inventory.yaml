@@ -1,0 +1,38 @@
+all:
+  children:
+    control_plane:
+      hosts:
+        k3s-master-01:  # Minisforum UM690 — Control Plane — tier: high
+          ansible_host: 192.168.1.100
+          ansible_user: admin
+          tier: high
+
+    workers:
+      hosts:
+        k3s-node-01:  # HP Envy — General workloads — tier: medium
+          ansible_host: 192.168.1.101
+          ansible_user: admin
+          tier: medium
+
+        k3s-node-02:  # Dell Optiplex Micro 1 — tier: low
+          ansible_host: 192.168.1.102
+          ansible_user: admin
+          tier: low
+
+        k3s-node-03:  # Dell Optiplex Micro 2 — tier: low
+          ansible_host: 192.168.1.103
+          ansible_user: admin
+          tier: low
+
+        k3s-node-04:  # Dell Optiplex Micro 3 — tier: low
+          ansible_host: 192.168.1.104
+          ansible_user: admin
+          tier: low
+
+    nas_nodes:
+      hosts:
+        nas-node-01:  # Robo-brain — NAS and backup — tier: nas
+          ansible_host: 192.168.1.105
+          ansible_user: admin
+          tier: nas
+

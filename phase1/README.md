@@ -2,18 +2,19 @@
 
 ## 🖥️ Section A: OS Installation & Baseline System Setup
 
-- [ ] ✅ Download latest Fedora Server ISO (LTS preferred for stability)
-- [ ] ✅ Flash USB (or PXE boot if automating installs)
-- [ ] 🚀 Install Fedora on each machine:
+- [x] ✅ Download latest Fedora Server ISO (LTS preferred for stability)
+- [x] ✅ Flash USB (or PXE boot if automating installs)
+- [x] 🚀 Install Fedora on each machine:
   - [ ] Set hostname (naming convention: `cluster-role-host`, e.g. `k8s-cp-rbrain`)
   - [ ] Set static IP or reserve via DHCP
-  - [ ] Partition disks (consider LVM for flexibility)
+  - [ ] Record Static Reservations and Hostname(s)
+  - [ ] Partition disks (consider LVM for flexibility) (?) - maybe I should?
   - [ ] Set timezone, locale, and NTP (chronyd)
   - [ ] Create non-root user (e.g. `opsadmin`)
   - [ ] Harden SSH:
     - [ ] Disable root login
     - [ ] Disable password auth
-    - [ ] Allow only ed25519 key-based login
+    - [ ] Allow only ed25519 key-based login (?) - possible
 
 ---
 
