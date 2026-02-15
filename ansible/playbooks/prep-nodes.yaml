@@ -1,0 +1,49 @@
+---
+# ==============================================================================
+# Node preparation playbook
+#
+# Applies base OS configuration to all nodes, K3s prerequisites to cluster
+# nodes, and NAS-specific setup to the NAS node.
+#
+# Usage:
+#   ansible-playbook playbooks/prep-nodes.yaml
+#   ansible-playbook playbooks/prep-nodes.yaml --tags common
+#   ansible-playbook playbooks/prep-nodes.yaml --tags prereqs
+#   ansible-playbook playbooks/prep-nodes.yaml --tags nas
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Play 1: Common configuration for ALL hosts
+# ------------------------------------------------------------------------------
+- name: Apply common configuration to all nodes
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: common
+      tags:
+        - common
+
+# ------------------------------------------------------------------------------
+# Play 2: K3s prerequisites for cluster nodes (control plane + workers)
+# ------------------------------------------------------------------------------
+- name: Apply K3s prerequisites to cluster nodes
+  hosts: k3s
+  become: true
+  gather_facts: true
+  roles:
+    - role: prereqs
+      tags:
+        - prereqs
+
+# ------------------------------------------------------------------------------
+# Play 3: NAS-specific configuration
+# ------------------------------------------------------------------------------
+- name: Apply NAS configuration
+  hosts: nas
+  become: true
+  gather_facts: true
+  roles:
+    - role: nas
+      tags:
+        - nas

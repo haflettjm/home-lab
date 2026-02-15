@@ -1,0 +1,20 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email: hafletjm01@gmail.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            email: hafletjm01@gmail.com
+            apiTokenSecretRef:
+              # TODO: Create a SealedSecret or regular Secret containing your
+              # Cloudflare API token with Zone:DNS:Edit permissions.
+              # Use the same secret as the production issuer.
+              name: cloudflare-api-token-secret
+              key: api-token

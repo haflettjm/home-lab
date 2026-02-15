@@ -1,0 +1,82 @@
+config:
+  # ── Proxmox Provider Configuration ──────────────────────────────────────────
+  proxmoxve:endpoint: "https://192.168.1.100:8006"
+  proxmoxve:insecure: "true"
+  # Authentication: set via environment variables PROXMOX_VE_USERNAME and
+  # PROXMOX_VE_PASSWORD (or PROXMOX_VE_API_TOKEN) rather than storing
+  # credentials in config.
+  proxmoxve:username: "root@pam"
+
+  # ── Infrastructure Settings ─────────────────────────────────────────────────
+  home-lab-infra:nodeName: "pve"
+  home-lab-infra:templateVmId: "9000"
+  home-lab-infra:gateway: "192.168.1.1"
+  home-lab-infra:dnsServer: "192.168.1.1"
+  home-lab-infra:bridge: "vmbr0"
+  home-lab-infra:datastore: "local-lvm"
+
+  # TODO: Replace with your actual SSH public key.
+  # Generate one with: ssh-keygen -t ed25519 -C "homelab"
+  home-lab-infra:sshPublicKey: "ssh-ed25519 AAAA_REPLACE_WITH_YOUR_PUBLIC_KEY homelab"
+
+  # ── Linode Edge Node ──────────────────────────────────────────────────────
+  # Provisions a Nanode ($5/mo) + NodeBalancer ($10/mo) = $15/mo
+  # Set LINODE_TOKEN env var with your API token.
+  # Generate one at: https://cloud.linode.com/profile/tokens
+  home-lab-infra:linodeRegion: "us-ord"
+  home-lab-infra:linodeLabel: "homelab-edge"
+  # TODO: Set this via `pulumi config set --secret linodeRootPassword "yourpass"`
+  home-lab-infra:linodeRootPassword:
+    secure: PLACEHOLDER_RUN_PULUMI_CONFIG_SET_SECRET
+  # TODO: Your home router's public IP or DDNS hostname for WireGuard peer
+  home-lab-infra:homeEndpoint: "YOUR_HOME_PUBLIC_IP:51820"
+  # TODO: WireGuard public key from your home lab's WireGuard server
+  home-lab-infra:homeWgPublicKey: "REPLACE_WITH_HOME_WG_PUBLIC_KEY"
+  # MetalLB IP where NGINX Ingress is listening on your home network
+  home-lab-infra:homeIngressIP: "192.168.1.200"
+
+  # ── VM Definitions ─────────────────────────────────────────────────────────
+  # Control plane node: higher specs for etcd and API server workloads.
+  # Worker nodes: k3s-node-01 has extra disk for persistent volume workloads;
+  # k3s-node-02 through k3s-node-04 are lighter general-purpose workers.
+  home-lab-infra:vmDefinitions:
+    - name: "k3s-master-01"
+      vmid: 110
+      cores: 4
+      memoryMB: 8192
+      diskGB: 64
+      ip: "192.168.1.100"
+      role: "server"
+      description: "K3s control plane node"
+    - name: "k3s-node-01"
+      vmid: 111
+      cores: 4
+      memoryMB: 8192
+      diskGB: 128
+      ip: "192.168.1.101"
+      role: "agent"
+      description: "K3s worker node 01 - primary workloads"
+    - name: "k3s-node-02"
+      vmid: 112
+      cores: 2
+      memoryMB: 4096
+      diskGB: 64
+      ip: "192.168.1.102"
+      role: "agent"
+      description: "K3s worker node 02"
+    - name: "k3s-node-03"
+      vmid: 113
+      cores: 2
+      memoryMB: 4096
+      diskGB: 64
+      ip: "192.168.1.103"
+      role: "agent"
+      description: "K3s worker node 03"
+    - name: "k3s-node-04"
+      vmid: 114
+      cores: 2
+      memoryMB: 4096
+      diskGB: 64
+      ip: "192.168.1.104"
+      role: "agent"
+      description: "K3s worker node 04"

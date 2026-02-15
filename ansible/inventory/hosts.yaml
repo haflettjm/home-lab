@@ -1,0 +1,69 @@
+---
+all:
+  children:
+    # ---------------------------------------------------------------------------
+    # K3s cluster: control plane + workers
+    # ---------------------------------------------------------------------------
+    k3s:
+      children:
+        control_plane:
+          hosts:
+            k3s-master-01:  # Minisforum UM690 - Control Plane (may run as Proxmox VM)
+              ansible_host: 192.168.1.100
+              tier: high
+              role: control_plane
+
+        workers:
+          hosts:
+            k3s-node-01:  # HP Envy - General workloads
+              ansible_host: 192.168.1.101
+              tier: medium
+              role: worker
+
+            k3s-node-02:  # Dell Optiplex Micro 1
+              ansible_host: 192.168.1.102
+              tier: low
+              role: worker
+
+            k3s-node-03:  # Dell Optiplex Micro 2
+              ansible_host: 192.168.1.103
+              tier: low
+              role: worker
+
+            k3s-node-04:  # Dell Optiplex Micro 3
+              ansible_host: 192.168.1.104
+              tier: low
+              role: worker
+
+    # ---------------------------------------------------------------------------
+    # NAS node - not part of K3s cluster, runs Podman workloads
+    # ---------------------------------------------------------------------------
+    nas:
+      hosts:
+        nas-node-01:  # Robo-brain - NAS and backup
+          ansible_host: 192.168.1.105
+          tier: nas
+          role: nas
+
+    # ---------------------------------------------------------------------------
+    # Linode edge node — WireGuard VPN endpoint + iptables forwarder
+    # Update ansible_host after `pulumi up` with the Nanode's public IP.
+    # ---------------------------------------------------------------------------
+    edge:
+      hosts:
+        homelab-edge:
+          ansible_host: REPLACE_AFTER_PULUMI_UP
+          ansible_user: root
+          role: edge
+
+    # ---------------------------------------------------------------------------
+    # WireGuard home endpoint — the K3s node that terminates the tunnel
+    # ---------------------------------------------------------------------------
+    wg_home:
+      hosts:
+        k3s-node-01:
+          ansible_host: 192.168.1.101
+
+  vars:
+    ansible_user: admin
+    ansible_python_interpreter: /usr/bin/python3

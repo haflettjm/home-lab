@@ -1,0 +1,185 @@
+---
+# WireGuard home endpoint — terminates the tunnel from the Linode edge node
+# and forwards traffic to the MetalLB ingress IP on the K3s cluster.
+#
+# Traffic flow: WireGuard tunnel → this node → iptables DNAT → MetalLB → NGINX Ingress
+
+- name: Install WireGuard
+  ansible.builtin.dnf:
+    name:
+      - wireguard-tools
+      - iptables-services
+    state: present
+  become: true
+  tags: [wireguard, packages]
+
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-wireguard.conf
+    reload: true
+    state: present
+  loop:
+    - net.ipv4.ip_forward
+    - net.ipv4.conf.all.forwarding
+  become: true
+  tags: [wireguard, sysctl]
+
+- name: Create WireGuard config directory
+  ansible.builtin.file:
+    path: "{{ wg_config_dir }}"
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  become: true
+  tags: [wireguard]
+
+- name: Check if WireGuard private key exists
+  ansible.builtin.stat:
+    path: "{{ wg_config_dir }}/private.key"
+  register: wg_privkey_stat
+  become: true
+  tags: [wireguard]
+
+- name: Generate WireGuard private key
+  ansible.builtin.shell:
+    cmd: wg genkey > {{ wg_config_dir }}/private.key
+    creates: "{{ wg_config_dir }}/private.key"
+  become: true
+  when: not wg_privkey_stat.stat.exists
+  tags: [wireguard]
+
+- name: Set private key permissions
+  ansible.builtin.file:
+    path: "{{ wg_config_dir }}/private.key"
+    mode: "0600"
+    owner: root
+    group: root
+  become: true
+  tags: [wireguard]
+
+- name: Generate WireGuard public key
+  ansible.builtin.shell:
+    cmd: cat {{ wg_config_dir }}/private.key | wg pubkey > {{ wg_config_dir }}/public.key
+    creates: "{{ wg_config_dir }}/public.key"
+  become: true
+  tags: [wireguard]
+
+- name: Read private key
+  ansible.builtin.slurp:
+    src: "{{ wg_config_dir }}/private.key"
+  register: wg_private_key_raw
+  become: true
+  tags: [wireguard]
+
+- name: Read public key
+  ansible.builtin.slurp:
+    src: "{{ wg_config_dir }}/public.key"
+  register: wg_public_key_raw
+  become: true
+  tags: [wireguard]
+
+- name: Set key facts
+  ansible.builtin.set_fact:
+    wg_private_key: "{{ wg_private_key_raw.content | b64decode | trim }}"
+    wg_public_key: "{{ wg_public_key_raw.content | b64decode | trim }}"
+  tags: [wireguard]
+
+- name: Display public key (copy this to the edge node config)
+  ansible.builtin.debug:
+    msg: >
+      HOME NODE PUBLIC KEY: {{ wg_public_key }}
+      Copy this to ansible/inventory/group_vars/edge.yaml as wg_peer_public_key
+  tags: [wireguard]
+
+- name: Deploy WireGuard config
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: "{{ wg_config_dir }}/{{ wg_interface }}.conf"
+    mode: "0600"
+    owner: root
+    group: root
+  become: true
+  notify: restart wireguard home
+  tags: [wireguard]
+
+- name: Enable and start WireGuard
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ wg_interface }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+  tags: [wireguard]
+
+# ── iptables forwarding ──────────────────────────────────────────────────
+# Forward ports 80/443 arriving on the WireGuard interface to the
+# MetalLB ingress IP on the local network.
+
+- name: Open WireGuard port in firewalld
+  ansible.posix.firewalld:
+    port: "{{ wg_port }}/udp"
+    permanent: true
+    immediate: true
+    state: enabled
+  become: true
+  tags: [wireguard, firewall]
+
+- name: Enable iptables service
+  ansible.builtin.systemd:
+    name: iptables
+    enabled: true
+    state: started
+  become: true
+  tags: [wireguard, iptables]
+
+- name: Add DNAT rule for HTTPS (443) to MetalLB ingress
+  ansible.builtin.iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: "{{ wg_interface }}"
+    protocol: tcp
+    destination_port: "443"
+    jump: DNAT
+    to_destination: "{{ wg_forward_target }}:443"
+    comment: "Forward HTTPS from WireGuard to K3s ingress"
+  become: true
+  notify: save iptables home
+  tags: [wireguard, iptables]
+
+- name: Add DNAT rule for HTTP (80) to MetalLB ingress
+  ansible.builtin.iptables:
+    table: nat
+    chain: PREROUTING
+    in_interface: "{{ wg_interface }}"
+    protocol: tcp
+    destination_port: "80"
+    jump: DNAT
+    to_destination: "{{ wg_forward_target }}:80"
+    comment: "Forward HTTP from WireGuard to K3s ingress"
+  become: true
+  notify: save iptables home
+  tags: [wireguard, iptables]
+
+- name: Add MASQUERADE for forwarded traffic
+  ansible.builtin.iptables:
+    table: nat
+    chain: POSTROUTING
+    destination: "{{ wg_forward_target }}"
+    jump: MASQUERADE
+    comment: "Masquerade traffic forwarded to K3s ingress"
+  become: true
+  notify: save iptables home
+  tags: [wireguard, iptables]
+
+- name: Allow forwarding from WireGuard to LAN
+  ansible.builtin.iptables:
+    chain: FORWARD
+    in_interface: "{{ wg_interface }}"
+    jump: ACCEPT
+    comment: "Allow forwarding from WireGuard to LAN"
+  become: true
+  notify: save iptables home
+  tags: [wireguard, iptables]

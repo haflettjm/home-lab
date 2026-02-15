@@ -1,0 +1,27 @@
+---
+# WireGuard home endpoint — runs on a K3s node to terminate the tunnel
+# from the Linode edge node.
+
+# WireGuard tunnel settings
+wg_interface: wg0
+wg_port: 51820
+wg_tunnel_ip: "10.0.0.2/24"
+
+# The edge node's WireGuard public key (generated on the Linode Nanode).
+# TODO: Replace after generating keys on the edge node.
+wg_peer_public_key: "REPLACE_WITH_EDGE_WG_PUBLIC_KEY"
+
+# The edge node's public IP + WireGuard port.
+# TODO: Replace after `pulumi up` with the Nanode's public IP.
+wg_peer_endpoint: "REPLACE_AFTER_PULUMI_UP:51820"
+
+# Allowed IPs from the edge side through the tunnel.
+wg_peer_allowed_ips: "10.0.0.1/32"
+
+# PersistentKeepalive — keeps the tunnel alive through NAT.
+# The home side initiates and maintains the connection since it's behind NAT.
+wg_peer_keepalive: 25
+
+# The MetalLB IP where NGINX Ingress Controller is listening.
+# Traffic arriving on this node's wg0 interface gets forwarded here.
+wg_forward_target: "192.168.1.200"

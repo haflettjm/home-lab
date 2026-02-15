@@ -1,0 +1,78 @@
+---
+# ==============================================================================
+# K3s cluster reset playbook
+#
+# Completely uninstalls K3s from all cluster nodes.
+# Agents are removed first to deregister cleanly, then the server is removed.
+#
+# WARNING: This is destructive. All K3s data, pods, and configuration will be
+# permanently deleted from the target nodes.
+#
+# Usage:
+#   ansible-playbook playbooks/reset-k3s.yaml
+#   ansible-playbook playbooks/reset-k3s.yaml --limit workers   # agents only
+#   ansible-playbook playbooks/reset-k3s.yaml --limit control_plane  # server only
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Play 1: Uninstall K3s agent from worker nodes first
+# ------------------------------------------------------------------------------
+- name: Uninstall K3s agent from worker nodes
+  hosts: workers
+  become: true
+  gather_facts: false
+  tags:
+    - reset
+    - reset_agents
+  tasks:
+    - name: Check if k3s-agent-uninstall.sh exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s-agent-uninstall.sh
+      register: k3s_agent_uninstall_script
+
+    - name: Run K3s agent uninstall script
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s-agent-uninstall.sh
+      when: k3s_agent_uninstall_script.stat.exists
+      changed_when: true
+
+    - name: Remove K3s agent configuration directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: absent
+      when: k3s_agent_uninstall_script.stat.exists
+
+# ------------------------------------------------------------------------------
+# Play 2: Uninstall K3s server from control plane nodes
+# ------------------------------------------------------------------------------
+- name: Uninstall K3s server from control plane nodes
+  hosts: control_plane
+  become: true
+  gather_facts: false
+  tags:
+    - reset
+    - reset_server
+  tasks:
+    - name: Check if k3s-uninstall.sh exists
+      ansible.builtin.stat:
+        path: /usr/local/bin/k3s-uninstall.sh
+      register: k3s_server_uninstall_script
+
+    - name: Run K3s server uninstall script
+      ansible.builtin.command:
+        cmd: /usr/local/bin/k3s-uninstall.sh
+      when: k3s_server_uninstall_script.stat.exists
+      changed_when: true
+
+    - name: Remove K3s server configuration directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: absent
+      when: k3s_server_uninstall_script.stat.exists
+
+    - name: Remove local kubeconfig copy
+      ansible.builtin.file:
+        path: "{{ kubeconfig_local_path }}"
+        state: absent
+      delegate_to: localhost
+      become: false

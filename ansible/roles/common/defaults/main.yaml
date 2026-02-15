@@ -1,0 +1,39 @@
+---
+# ==============================================================================
+# Common role defaults
+# These values can be overridden in group_vars or host_vars
+# ==============================================================================
+
+timezone: "America/New_York"
+selinux_state: permissive
+
+common_packages:
+  - vim
+  - tmux
+  - htop
+  - curl
+  - wget
+  - git
+  - net-tools
+  - bind-utils
+  - lsof
+  - bash-completion
+  - unzip
+  - jq
+  - firewalld
+  - policycoreutils
+  - chrony
+  - rsync
+  - tar
+  - gzip
+
+k8s_sysctl_params:
+  net.bridge.bridge-nf-call-iptables: 1
+  net.bridge.bridge-nf-call-ip6tables: 1
+  net.ipv4.ip_forward: 1
+
+k8s_kernel_modules:
+  - overlay
+  - br_netfilter
+
+ssh_authorized_keys: []

@@ -1,0 +1,22 @@
+---
+# ==============================================================================
+# Common role handlers
+# ==============================================================================
+
+- name: Restart chronyd
+  ansible.builtin.systemd:
+    name: chronyd
+    state: restarted
+  become: true
+
+- name: Restart firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: restarted
+  become: true
+
+- name: Reload sysctl
+  ansible.builtin.command:
+    cmd: sysctl --system
+  become: true
+  changed_when: true

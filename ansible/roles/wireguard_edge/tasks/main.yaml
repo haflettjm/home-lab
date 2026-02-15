@@ -1,0 +1,185 @@
+---
+# WireGuard + iptables forwarding on Linode edge node (Nanode)
+#
+# This role turns the Nanode into a dumb packet forwarder:
+#   NodeBalancer → Nanode:80/443 → iptables DNAT → WireGuard tunnel → Home K3s
+
+- name: Install packages
+  ansible.builtin.dnf:
+    name: "{{ edge_packages }}"
+    state: present
+  become: true
+  tags: [wireguard, packages]
+
+- name: Enable IP forwarding
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_file: /etc/sysctl.d/99-wireguard.conf
+    reload: true
+    state: present
+  loop:
+    - net.ipv4.ip_forward
+    - net.ipv4.conf.all.forwarding
+  become: true
+  tags: [wireguard, sysctl]
+
+- name: Create WireGuard config directory
+  ansible.builtin.file:
+    path: "{{ wg_config_dir }}"
+    state: directory
+    mode: "0700"
+    owner: root
+    group: root
+  become: true
+  tags: [wireguard]
+
+- name: Check if WireGuard private key exists
+  ansible.builtin.stat:
+    path: "{{ wg_config_dir }}/private.key"
+  register: wg_privkey_stat
+  become: true
+  tags: [wireguard]
+
+- name: Generate WireGuard private key
+  ansible.builtin.shell:
+    cmd: wg genkey > {{ wg_config_dir }}/private.key
+    creates: "{{ wg_config_dir }}/private.key"
+  become: true
+  when: not wg_privkey_stat.stat.exists
+  tags: [wireguard]
+
+- name: Set private key permissions
+  ansible.builtin.file:
+    path: "{{ wg_config_dir }}/private.key"
+    mode: "0600"
+    owner: root
+    group: root
+  become: true
+  tags: [wireguard]
+
+- name: Generate WireGuard public key
+  ansible.builtin.shell:
+    cmd: cat {{ wg_config_dir }}/private.key | wg pubkey > {{ wg_config_dir }}/public.key
+    creates: "{{ wg_config_dir }}/public.key"
+  become: true
+  tags: [wireguard]
+
+- name: Read private key
+  ansible.builtin.slurp:
+    src: "{{ wg_config_dir }}/private.key"
+  register: wg_private_key_raw
+  become: true
+  tags: [wireguard]
+
+- name: Read public key
+  ansible.builtin.slurp:
+    src: "{{ wg_config_dir }}/public.key"
+  register: wg_public_key_raw
+  become: true
+  tags: [wireguard]
+
+- name: Set key facts
+  ansible.builtin.set_fact:
+    wg_private_key: "{{ wg_private_key_raw.content | b64decode | trim }}"
+    wg_public_key: "{{ wg_public_key_raw.content | b64decode | trim }}"
+  tags: [wireguard]
+
+- name: Display public key (copy this to the home side config)
+  ansible.builtin.debug:
+    msg: >
+      EDGE NODE PUBLIC KEY: {{ wg_public_key }}
+      Copy this to ansible/inventory/group_vars/wg_home.yaml as wg_peer_public_key
+  tags: [wireguard]
+
+- name: Deploy WireGuard config
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: "{{ wg_config_dir }}/{{ wg_interface }}.conf"
+    mode: "0600"
+    owner: root
+    group: root
+  become: true
+  notify: restart wireguard
+  tags: [wireguard]
+
+- name: Enable and start WireGuard
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ wg_interface }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+  tags: [wireguard]
+
+# ── iptables forwarding rules ─────────────────────────────────────────────
+# Forward ports 80 and 443 from the Nanode's public interface through
+# the WireGuard tunnel to the home side endpoint.
+
+- name: Enable iptables service
+  ansible.builtin.systemd:
+    name: iptables
+    enabled: true
+    state: started
+  become: true
+  tags: [wireguard, iptables]
+
+- name: Add DNAT rule for HTTPS (443)
+  ansible.builtin.iptables:
+    table: nat
+    chain: PREROUTING
+    protocol: tcp
+    destination_port: "443"
+    jump: DNAT
+    to_destination: "{{ wg_forward_target }}:443"
+    comment: "Forward HTTPS to home lab via WireGuard"
+  become: true
+  notify: save iptables
+  tags: [wireguard, iptables]
+
+- name: Add DNAT rule for HTTP (80)
+  ansible.builtin.iptables:
+    table: nat
+    chain: PREROUTING
+    protocol: tcp
+    destination_port: "80"
+    jump: DNAT
+    to_destination: "{{ wg_forward_target }}:80"
+    comment: "Forward HTTP to home lab via WireGuard"
+  become: true
+  notify: save iptables
+  tags: [wireguard, iptables]
+
+- name: Add MASQUERADE rule for forwarded traffic
+  ansible.builtin.iptables:
+    table: nat
+    chain: POSTROUTING
+    out_interface: "{{ wg_interface }}"
+    jump: MASQUERADE
+    comment: "Masquerade forwarded traffic through WireGuard"
+  become: true
+  notify: save iptables
+  tags: [wireguard, iptables]
+
+- name: Allow forwarding from public interface to WireGuard
+  ansible.builtin.iptables:
+    chain: FORWARD
+    in_interface: eth0
+    out_interface: "{{ wg_interface }}"
+    jump: ACCEPT
+    comment: "Allow forwarding to WireGuard tunnel"
+  become: true
+  notify: save iptables
+  tags: [wireguard, iptables]
+
+- name: Allow forwarding from WireGuard to public interface
+  ansible.builtin.iptables:
+    chain: FORWARD
+    in_interface: "{{ wg_interface }}"
+    out_interface: eth0
+    ctstate: ESTABLISHED,RELATED
+    jump: ACCEPT
+    comment: "Allow return traffic from WireGuard"
+  become: true
+  notify: save iptables
+  tags: [wireguard, iptables]

@@ -1,144 +1,226 @@
-# 🏡 Home-Lab Kubernetes Platform
+# Home-Lab Kubernetes Platform
 
-This repository manages the infrastructure, configuration, and application deployment for a self-hosted Kubernetes cluster built from scratch using physical machines in a home-lab environment.
+Self-hosted K3s cluster on physical hardware, provisioned with Ansible and managed via ArgoCD GitOps.
 
-The project is designed to scale from lightweight workloads to production-grade services, with future expansion into cloud-backed hybrid infrastructure.
-
----
-
-## Current Phase:
-### **Phase(s): 01-02**
-
----
-
-## 📦 Features
-
-- **K3s-based Kubernetes cluster** with optional migration to kubeadm or cloud-managed K8s
-- **Infrastructure-as-Code** using Ansible and Terraform
-- **Automated provisioning scripts** for first-time node setup
-- **NGINX Ingress Controller** with optional Traefik fallback
-- **Persistent storage support** (e.g., Longhorn or NFS)
-- **Monitoring stack** with Prometheus, Grafana, and Loki
-- **Modular application deployment** via Terraform modules
-- **Planned support** for GitOps, secret management, and remote scaling
+**Base OS:** Rocky Linux 9
+**Hypervisor:** Proxmox VE (hybrid — control plane virtualized, workers bare-metal)
+**IaC:** Ansible (OS/K3s/WireGuard) + Pulumi (Proxmox VMs + Linode edge)
+**GitOps:** ArgoCD (App-of-Apps pattern)
+**Public Ingress:** Linode NodeBalancer + Nanode → WireGuard tunnel → Home K3s
 
 ---
 
-## 🔁 Project Phases
+## Hardware
 
-| Phase | Description |
-|-------|-------------|
-| 1. Inventory Management       | Track machine specs manually or via script. |
-| 2. Infrastructure Preparation | Set up OS, SSH, VM layers, and packages. |
-| 3. Kubernetes Setup           | Bootstrap cluster with K3s. |
-| 4. Networking & Storage       | DNS, Ingress (NGINX), persistent volumes. |
-| 5. App Hosting                | Deploy apps using Terraform. |
-| 6. Monitoring & Observability | Prometheus, Grafana, logging, etc. |
-| 7. Maintenance & Scaling      | Node mgmt, patching, backups, cloud-ready. |
+| Hostname | Hardware | IP | Role | Approach |
+|----------|----------|----|------|----------|
+| `k3s-master-01` | Minisforum UM690 | 192.168.1.100 | K3s Control Plane | Proxmox VM |
+| `k3s-node-01` | HP Envy | 192.168.1.101 | K3s Worker | Bare-metal |
+| `k3s-node-02` | Dell Optiplex Micro 1 | 192.168.1.102 | K3s Worker | Bare-metal |
+| `k3s-node-03` | Dell Optiplex Micro 2 | 192.168.1.103 | K3s Worker | Bare-metal |
+| `k3s-node-04` | Dell Optiplex Micro 3 | 192.168.1.104 | K3s Worker | Bare-metal |
+| `nas-node-01` | Robo-brain | 192.168.1.105 | NAS / Storage | Bare-metal + Podman |
+| `homelab-edge` | Linode Nanode 1GB | (public) | WireGuard + iptables forwarder | Linode ($5/mo) |
+| — | Linode NodeBalancer | (public) | Public HTTPS entry point | Linode ($10/mo) |
 
 ---
 
-## 🧱 Project Structure
+## Stack
+
+| Layer | Tool | Notes |
+|-------|------|-------|
+| OS | Rocky Linux 9 | Stable RHEL-based, 10-year support |
+| Hypervisor | Proxmox VE | Control plane VM for snapshotting |
+| VM Provisioning | Pulumi (Go) | bpg/proxmoxve provider, cloud-init templates |
+| Edge Infra | Pulumi (Go) + Linode | Nanode ($5/mo) + NodeBalancer ($10/mo) |
+| VPN Tunnel | WireGuard | Encrypted tunnel from Linode edge to home network |
+| Config Management | Ansible | Node prep, K3s install, NAS setup, WireGuard |
+| Kubernetes | K3s | Lightweight, single-binary |
+| CNI | Cilium | eBPF-based, replaces kube-proxy, Hubble UI |
+| Load Balancer | MetalLB | L2 mode, 192.168.1.200-220 |
+| Ingress | NGINX Ingress Controller | DaemonSet mode |
+| TLS | cert-manager | Cloudflare DNS-01, Let's Encrypt |
+| Storage | Longhorn + NFS | Longhorn default (2 replicas), NFS from NAS |
+| GitOps | ArgoCD | App-of-Apps, auto-sync + self-heal |
+| Secrets | Sealed Secrets | Git-safe encrypted secrets |
+| Monitoring | kube-prometheus-stack + Loki | Prometheus, Grafana, Alertmanager, log aggregation |
+| Containers (NAS) | Podman | Standalone containers on NAS node |
+
+---
+
+## Project Structure
 
 ```
 home-lab/
-├── phase1-inventory/         # Hardware discovery, inventory tracking scripts
-│   └── inventory.yaml
+├── ansible/                    # OS prep + K3s provisioning
+│   ├── ansible.cfg
+│   ├── inventory/
+│   │   ├── hosts.yaml          # Node inventory
+│   │   └── group_vars/
+│   │       ├── all.yaml        # Global vars (k3s version, packages, etc.)
+│   │       ├── control_plane.yaml
+│   │       ├── workers.yaml
+│   │       └── nas.yaml
+│   ├── playbooks/
+│   │   ├── site.yaml           # Full run (prep + install)
+│   │   ├── prep-nodes.yaml     # OS config, packages, firewall
+│   │   ├── install-k3s.yaml    # K3s server + agent install
+│   │   └── reset-k3s.yaml     # Tear down cluster
+│   └── roles/
+│       ├── common/             # Base packages, chrony, sysctl, swap, SELinux
+│       ├── prereqs/            # K3s prereqs, firewall ports, iscsid
+│       ├── k3s_server/         # K3s server install + kubeconfig fetch
+│       ├── k3s_agent/          # K3s agent join
+│       ├── nas/                # Podman + NFS server setup
+│       ├── wireguard_edge/     # WireGuard + iptables on Linode Nanode
+│       └── wireguard_home/     # WireGuard + iptables on home K3s node
 │
-├── phase2-prep/              # OS prep scripts and Ansible roles (SSH, packages, users)
-│   ├── ansible/
-│   └── prep-fedora.sh
+├── pulumi/                     # Infrastructure provisioning (Go)
+│   ├── Pulumi.yaml
+│   ├── main.go                 # Orchestrates Proxmox + Linode
+│   ├── config.go               # Proxmox VM config loading
+│   ├── linode.go               # Linode edge node + NodeBalancer
+│   └── go.mod
 │
-├── phase3-k8s-install/       # K3s install, control plane bootstrap, node joining
-│   ├── k3s-install.yml
-│   └── kubeconfig/
+├── kubernetes/                 # GitOps root (ArgoCD watches this)
+│   ├── bootstrap/
+│   │   └── argocd/             # ArgoCD initial install + root app
+│   ├── infrastructure/         # Cluster infrastructure (sync wave ordered)
+│   │   ├── cilium/             # Wave 1: CNI
+│   │   ├── metallb/            # Wave 2: Load balancer + IP pool
+│   │   ├── ingress-nginx/      # Wave 3: Ingress controller
+│   │   ├── cert-manager/       # Wave 3: TLS + ClusterIssuers
+│   │   ├── longhorn/           # Wave 3: Distributed storage
+│   │   ├── sealed-secrets/     # Wave 3: Secret management
+│   │   ├── nfs-provisioner/    # Wave 3: NAS storage class
+│   │   └── monitoring/         # Wave 4: Prometheus + Loki
+│   └── apps/                   # User applications (deployed via ArgoCD)
 │
-├── phase4-networking/        # Ingress, MetalLB, DNS, cert-manager
-│   ├── helm-charts/
-│   └── scripts/
-│       └── setup-networking.sh
+├── scripts/
+│   └── bootstrap.sh            # Full cluster orchestrator
 │
-├── phase5-apps/              # Terraform modules for application deployment
-│   ├── terraform/
-│   │   ├── modules/
-│   │   └── environments/
-│   └── k8s/apps/
+├── phase1/                     # (Legacy) Hardware inventory + prep checklist
+│   ├── inventory.yaml
+│   └── prep/PREP-CHECKLIST.md
 │
-├── phase6-monitoring/        # Monitoring stack (Prometheus, Grafana, Loki)
-│   └── manifests/
+├── phase2/                     # (Legacy) Package requirement lists
+│   └── reqs/
 │
-├── phase7-maintenance/       # Backups, scaling, updates, long-term ops
-│   ├── upgrade-scripts/
-│   └── node-tools/
-│
-├── scripts/                  # Bootstrap wrapper (infra-up.sh, checks, helpers)
-│   └── infra-up.sh
-│
-├── HOME-LAB.md               # Full system plan and status tracker
-└── README.md                 # Top-level project overview
+├── .gitignore
+└── README.md
 ```
 
 ---
 
+## Getting Started
 
-## 🚀 Getting Started
+### Prerequisites
 
-### 1. Install Fedora Server on All Nodes
-- Use the `prep-fedora.sh` script to configure each machine
-- Ensure SSH access and hostnames are set correctly
+On your admin workstation:
+- Ansible, Pulumi, kubectl, Helm, k9s
+- SSH access to all nodes (as `admin` user)
 
-### 2. Define Hardware Inventory
-Update `inventory.yaml` with each node’s role, IP, and hardware specs.
-
-### 3. Run Infrastructure Bootstrap
+### 1. Provision VMs (if using Proxmox)
 
 ```bash
-cd scripts/
-./infra-up.sh
+cd pulumi/
+pulumi up
 ```
 
-This will:
-- Run system prep via Ansible
-- Install K3s and required components
-- Deploy base infrastructure (NGINX, MetalLB, cert-manager)
-- Launch initial applications via Terraform
+### 2. Prepare All Nodes
+
+```bash
+cd ansible/
+ansible-playbook -i inventory/hosts.yaml playbooks/prep-nodes.yaml
+```
+
+### 3. Install K3s
+
+```bash
+ansible-playbook -i inventory/hosts.yaml playbooks/install-k3s.yaml
+```
+
+### 4. Bootstrap ArgoCD
+
+```bash
+bash kubernetes/bootstrap/argocd/install.sh
+```
+
+ArgoCD will auto-deploy everything in `kubernetes/infrastructure/` via the App-of-Apps.
+
+### 5. Set Up Public Ingress (Linode + WireGuard)
+
+Pulumi provisions the Linode edge infra (Nanode + NodeBalancer) alongside Proxmox VMs.
+After `pulumi up`, configure the WireGuard tunnel:
+
+```bash
+# Get the edge node's public IP
+pulumi stack output edgeNodeIP
+
+# Update inventory with the edge IP
+# → ansible/inventory/hosts.yaml: homelab-edge → ansible_host
+# → ansible/inventory/group_vars/wg_home.yaml: wg_peer_endpoint
+
+# Generate keys on home side, then edge side, swap public keys
+ansible-playbook -i inventory/hosts.yaml playbooks/setup-wireguard.yaml --limit wg_home
+# Copy displayed public key → group_vars/edge.yaml → wg_peer_public_key
+
+ansible-playbook -i inventory/hosts.yaml playbooks/setup-wireguard.yaml --limit edge
+# Copy displayed public key → group_vars/wg_home.yaml → wg_peer_public_key
+
+# Deploy final configs with correct peer keys
+ansible-playbook -i inventory/hosts.yaml playbooks/setup-wireguard.yaml
+
+# Port forward 51820/UDP on your home router to 192.168.1.101 (k3s-node-01)
+# Point DNS *.yourdomain.com → NodeBalancer IP (pulumi stack output nodeBalancerIPv4)
+```
+
+**Traffic flow:**
+```
+Internet → NodeBalancer ($10/mo) → Nanode ($5/mo) → WireGuard → Home K3s → NGINX Ingress → Apps
+```
+
+### Or Run Everything
+
+```bash
+./scripts/bootstrap.sh all
+```
+
+### Tear Down
+
+```bash
+./scripts/bootstrap.sh reset
+```
 
 ---
 
-## 📈 Planned Services
+## Planned Services
 
-- GitOps via ArgoCD or Flux
-- Monitoring with Prometheus stack
-- Secret management (Vault, Sealed Secrets)
-- Local LLM inference (Ollama, Mistral)
-- Public app hosting (NGINX Ingress + Cert-Manager)
-- Home automation, dashboards, file sharing
+- Local LLM inference (Ollama)
+- Home automation dashboards
+- File sharing / media server
+- Personal wiki / notes
 
 ---
 
-## 📚 Documentation
+## TODO-READ
 
-- [HOME-LAB.md](./HOME-LAB.md) — full project plan & architecture
-- `ansible/` — node setup and cluster install roles
-- `terraform/` — application modules and environment configs
+- [Rocky Linux for Beginners: Build Your First Homelab with Proxmox, Docker, Kubernetes, Ansible & Modern Home Servers](https://www.amazon.com/Rocky-Linux-Beginners-Homelab-Kubernetes/dp/B0GC51PHBK)
 
 ---
 
-## 🛠️ Requirements
+## Requirements
 
-- 3–4 physical machines (4+ core, 16GB RAM, 128GB SSD recommended)
-- Fedora Server (or similar Linux)
-- Ansible + Terraform installed on control node
-- SSH access between control node and all cluster machines
-
----
-
-## 🤝 Contributing
-
-This project is designed for personal experimentation and practical DevOps learning. PRs, suggestions, and issue reports are welcome if you're interested in expanding it.
+- 5 physical machines (specs vary, see Hardware table)
+- Rocky Linux 9 on all nodes (or Proxmox VE on hypervisor nodes)
+- Ansible + Pulumi + Helm + kubectl on admin workstation
+- SSH access from admin workstation to all nodes
+- (Optional) Domain + Cloudflare account for TLS certificates
+- Linode account + API token for edge node ($15/mo total)
+- Home router capable of port forwarding UDP 51820 for WireGuard
 
 ---
 
-## 📜 License
+## License
 
 ????

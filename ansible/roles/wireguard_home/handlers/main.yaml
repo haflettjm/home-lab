@@ -1,0 +1,12 @@
+---
+- name: restart wireguard home
+  ansible.builtin.systemd:
+    name: "wg-quick@{{ wg_interface }}"
+    state: restarted
+    daemon_reload: true
+  become: true
+
+- name: save iptables home
+  ansible.builtin.shell:
+    cmd: iptables-save > /etc/sysconfig/iptables
+  become: true

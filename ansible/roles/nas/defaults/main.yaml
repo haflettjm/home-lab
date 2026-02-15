@@ -1,0 +1,23 @@
+---
+# ==============================================================================
+# NAS role defaults
+# ==============================================================================
+
+nfs_export_path: /export/k3s-nfs
+nfs_export_network: "192.168.1.0/24"
+nfs_export_options: "rw,sync,no_subtree_check,no_root_squash"
+
+nas_podman_packages:
+  - podman
+  - podman-docker
+  - skopeo
+  - buildah
+
+nas_nfs_packages:
+  - nfs-utils
+
+nas_firewall_services:
+  - nfs
+  - nfs3
+  - mountd
+  - rpc-bind

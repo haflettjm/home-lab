@@ -1,0 +1,44 @@
+---
+# ==============================================================================
+# Worker node (K3s agent) group variables
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# K3s agent extra arguments
+# ------------------------------------------------------------------------------
+k3s_agent_args: ""
+
+# ------------------------------------------------------------------------------
+# Packages specific to worker nodes
+# ------------------------------------------------------------------------------
+k3s_role_packages:
+  - socat
+  - conntrack
+  - iptables
+  - ipset
+  - ethtool
+  - ebtables
+  - iscsi-initiator-utils
+  - nfs-utils
+
+# ------------------------------------------------------------------------------
+# Firewall ports required on worker nodes
+# ------------------------------------------------------------------------------
+k3s_firewall_ports:
+  - port: 10250
+    protocol: tcp
+    comment: "Kubelet metrics"
+  - port: 8472
+    protocol: udp
+    comment: "VXLAN overlay (Cilium/Flannel)"
+  - port: 30000-32767
+    protocol: tcp
+    comment: "NodePort services"
+  - port: 4240
+    protocol: tcp
+    comment: "Cilium health checks"
+
+# ------------------------------------------------------------------------------
+# Enable iSCSI for Longhorn storage
+# ------------------------------------------------------------------------------
+enable_iscsid: true

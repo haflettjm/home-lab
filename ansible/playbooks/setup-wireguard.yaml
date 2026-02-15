@@ -1,0 +1,35 @@
+---
+# Sets up the WireGuard tunnel between the Linode edge node and the home lab.
+#
+# Run order:
+#   1. Run on home side FIRST to generate keys
+#   2. Copy home public key to inventory/group_vars/edge.yaml
+#   3. Run on edge side to generate keys
+#   4. Copy edge public key to inventory/group_vars/wg_home.yaml
+#   5. Re-run both to apply final configs with correct peer keys
+#
+# Usage:
+#   # Step 1: Generate home side keys
+#   ansible-playbook -i inventory/hosts.yaml playbooks/setup-wireguard.yaml --limit wg_home
+#
+#   # Step 2: Copy the displayed public key to group_vars/edge.yaml
+#
+#   # Step 3: Generate edge side keys
+#   ansible-playbook -i inventory/hosts.yaml playbooks/setup-wireguard.yaml --limit edge
+#
+#   # Step 4: Copy the displayed public key to group_vars/wg_home.yaml
+#
+#   # Step 5: Re-run both to deploy final configs
+#   ansible-playbook -i inventory/hosts.yaml playbooks/setup-wireguard.yaml
+
+- name: Configure WireGuard on home endpoint
+  hosts: wg_home
+  become: true
+  roles:
+    - wireguard_home
+
+- name: Configure WireGuard + iptables on Linode edge node
+  hosts: edge
+  become: true
+  roles:
+    - wireguard_edge

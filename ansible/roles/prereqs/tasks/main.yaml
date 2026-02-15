@@ -1,0 +1,60 @@
+---
+# ==============================================================================
+# K3s prerequisites role
+# Installs role-specific packages and configures firewall ports for K3s
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Install role-specific packages (defined in group_vars per node group)
+# ------------------------------------------------------------------------------
+- name: Install K3s role-specific packages
+  ansible.builtin.dnf:
+    name: "{{ k3s_role_packages }}"
+    state: present
+  become: true
+  when: k3s_role_packages is defined and k3s_role_packages | length > 0
+  tags:
+    - prereqs
+    - packages
+
+# ------------------------------------------------------------------------------
+# Firewall configuration for K3s
+# ------------------------------------------------------------------------------
+- name: Open K3s firewall ports
+  ansible.posix.firewalld:
+    port: "{{ item.port }}/{{ item.protocol }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop: "{{ k3s_firewall_ports }}"
+  become: true
+  when: k3s_firewall_ports is defined and k3s_firewall_ports | length > 0
+  tags:
+    - prereqs
+    - firewall
+
+- name: Allow masquerading in firewalld (required for pod networking)
+  ansible.posix.firewalld:
+    masquerade: true
+    permanent: true
+    immediate: true
+    state: enabled
+  become: true
+  tags:
+    - prereqs
+    - firewall
+
+# ------------------------------------------------------------------------------
+# iSCSI service for Longhorn storage (workers only)
+# ------------------------------------------------------------------------------
+- name: Enable and start iscsid service (for Longhorn)
+  ansible.builtin.systemd:
+    name: iscsid
+    state: started
+    enabled: true
+  become: true
+  when: enable_iscsid | default(false) | bool
+  tags:
+    - prereqs
+    - storage
+    - longhorn

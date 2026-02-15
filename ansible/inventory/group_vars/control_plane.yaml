@@ -1,0 +1,81 @@
+---
+# ==============================================================================
+# Control plane (K3s server) group variables
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# K3s server extra arguments
+# Disables bundled components in favour of Cilium CNI, MetalLB, and NGINX Ingress
+# ------------------------------------------------------------------------------
+k3s_server_args: >-
+  --disable traefik
+  --disable servicelb
+  --disable-network-policy
+  --flannel-backend=none
+  --disable-kube-proxy
+  --write-kubeconfig-mode 0644
+  --tls-san {{ ansible_host }}
+  --tls-san {{ inventory_hostname }}
+  --tls-san 192.168.1.100
+  --cluster-cidr {{ cluster_cidr }}
+  --service-cidr {{ service_cidr }}
+  --node-taint node-role.kubernetes.io/control-plane=true:NoSchedule
+
+# ------------------------------------------------------------------------------
+# K3s server config file values (used by config.yaml.j2 template)
+# These mirror the CLI args above for the config-file approach
+# ------------------------------------------------------------------------------
+k3s_server_config:
+  write-kubeconfig-mode: "0644"
+  tls-san:
+    - "{{ ansible_host }}"
+    - "{{ inventory_hostname }}"
+    - "192.168.1.100"
+  cluster-cidr: "{{ cluster_cidr }}"
+  service-cidr: "{{ service_cidr }}"
+  disable:
+    - traefik
+    - servicelb
+  disable-network-policy: true
+  disable-kube-proxy: true
+  flannel-backend: "none"
+  node-taint:
+    - "node-role.kubernetes.io/control-plane=true:NoSchedule"
+
+# ------------------------------------------------------------------------------
+# Packages specific to control plane nodes
+# ------------------------------------------------------------------------------
+k3s_role_packages:
+  - socat
+  - conntrack
+  - ipset
+  - iptables
+  - ethtool
+  - ebtables
+  - nfs-utils
+
+# ------------------------------------------------------------------------------
+# Firewall ports required on control plane nodes
+# ------------------------------------------------------------------------------
+k3s_firewall_ports:
+  - port: 6443
+    protocol: tcp
+    comment: "K3s API server"
+  - port: 10250
+    protocol: tcp
+    comment: "Kubelet metrics"
+  - port: 8472
+    protocol: udp
+    comment: "VXLAN overlay (Cilium/Flannel)"
+  - port: 2379-2380
+    protocol: tcp
+    comment: "etcd client and peer"
+  - port: 4240
+    protocol: tcp
+    comment: "Cilium health checks"
+  - port: 4244
+    protocol: tcp
+    comment: "Cilium Hubble relay"
+  - port: 4245
+    protocol: tcp
+    comment: "Cilium Hubble UI"

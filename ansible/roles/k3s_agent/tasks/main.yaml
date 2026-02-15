@@ -1,0 +1,86 @@
+---
+# ==============================================================================
+# K3s agent (worker node) installation role
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Install K3s SELinux policy
+# ------------------------------------------------------------------------------
+- name: Install k3s-selinux RPM
+  ansible.builtin.dnf:
+    name: "https://rpm.rancher.io/k3s/stable/common/centos/9/noarch/k3s-selinux-1.6-1.el9.noarch.rpm"
+    state: present
+    disable_gpg_check: true
+  become: true
+  tags:
+    - k3s_agent
+    - selinux
+
+# ------------------------------------------------------------------------------
+# Download and install K3s agent
+# ------------------------------------------------------------------------------
+- name: Download K3s install script
+  ansible.builtin.get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: "0755"
+  become: true
+  tags:
+    - k3s_agent
+    - install
+
+- name: Run K3s agent install script
+  ansible.builtin.command:
+    cmd: /tmp/k3s-install.sh
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+    INSTALL_K3S_EXEC: "agent"
+    K3S_URL: "{{ k3s_server_url }}"
+    K3S_TOKEN: "{{ hostvars[groups['control_plane'][0]]['k3s_token'] }}"
+  args:
+    creates: /usr/local/bin/k3s
+  become: true
+  tags:
+    - k3s_agent
+    - install
+
+- name: Ensure k3s-agent service is enabled and started
+  ansible.builtin.systemd:
+    name: k3s-agent
+    state: started
+    enabled: true
+    daemon_reload: true
+  become: true
+  tags:
+    - k3s_agent
+    - service
+
+# ------------------------------------------------------------------------------
+# Wait for the agent node to be ready
+# ------------------------------------------------------------------------------
+- name: Wait for agent node to register with the cluster
+  ansible.builtin.shell:
+    cmd: >
+      k3s kubectl get nodes | grep -w "{{ inventory_hostname }}" | grep -w "Ready"
+  register: agent_node_ready
+  retries: 30
+  delay: 10
+  until: agent_node_ready.rc == 0
+  changed_when: false
+  delegate_to: "{{ groups['control_plane'][0] }}"
+  become: true
+  tags:
+    - k3s_agent
+    - verify
+
+# ------------------------------------------------------------------------------
+# Clean up
+# ------------------------------------------------------------------------------
+- name: Remove K3s install script
+  ansible.builtin.file:
+    path: /tmp/k3s-install.sh
+    state: absent
+  become: true
+  tags:
+    - k3s_agent
+    - cleanup

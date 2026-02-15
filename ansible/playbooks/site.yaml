@@ -1,0 +1,19 @@
+---
+# ==============================================================================
+# Master playbook - Full cluster provisioning
+#
+# Runs the complete provisioning pipeline:
+#   1. prep-nodes.yaml  - OS hardening, packages, kernel tuning on all hosts
+#   2. install-k3s.yaml - K3s server on control plane, agents on workers
+#
+# Usage:
+#   ansible-playbook playbooks/site.yaml
+#   ansible-playbook playbooks/site.yaml --tags common      # only common role
+#   ansible-playbook playbooks/site.yaml --limit workers    # only worker nodes
+# ==============================================================================
+
+- name: Phase 1 - Prepare all nodes
+  ansible.builtin.import_playbook: prep-nodes.yaml
+
+- name: Phase 2 - Install K3s cluster
+  ansible.builtin.import_playbook: install-k3s.yaml

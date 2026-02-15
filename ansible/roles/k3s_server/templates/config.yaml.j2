@@ -1,0 +1,32 @@
+# K3s server configuration file
+# Managed by Ansible - do not edit manually
+#
+# This file provides an alternative to CLI arguments.
+# K3s reads this from /etc/rancher/k3s/config.yaml at startup.
+# Reference: https://docs.k3s.io/installation/configuration#configuration-file
+
+write-kubeconfig-mode: "{{ k3s_server_config['write-kubeconfig-mode'] | default('0644') }}"
+
+tls-san:
+{% for san in k3s_server_config['tls-san'] | default([]) %}
+  - "{{ san }}"
+{% endfor %}
+
+cluster-cidr: "{{ k3s_server_config['cluster-cidr'] | default(cluster_cidr) }}"
+service-cidr: "{{ k3s_server_config['service-cidr'] | default(service_cidr) }}"
+
+disable:
+{% for component in k3s_server_config['disable'] | default([]) %}
+  - "{{ component }}"
+{% endfor %}
+
+disable-network-policy: {{ k3s_server_config['disable-network-policy'] | default(true) | lower }}
+disable-kube-proxy: {{ k3s_server_config['disable-kube-proxy'] | default(true) | lower }}
+flannel-backend: "{{ k3s_server_config['flannel-backend'] | default('none') }}"
+
+{% if k3s_server_config['node-taint'] is defined %}
+node-taint:
+{% for taint in k3s_server_config['node-taint'] %}
+  - "{{ taint }}"
+{% endfor %}
+{% endif %}

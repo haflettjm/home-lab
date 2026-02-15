@@ -1,0 +1,46 @@
+# Kubernetes
+kubeconfig
+*.kubeconfig
+kubeconfig.yaml
+
+# Pulumi
+.pulumi/
+pulumi/go.sum
+
+# WireGuard
+*.wg.conf
+wg-private.key
+
+# Ansible
+*.retry
+vault_password
+.vault_pass
+inventory/**/vault.yaml
+
+# Secrets / Environment
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+id_rsa
+id_ed25519
+credentials.json
+secrets.yaml
+sealed-secrets-key.yaml
+
+# K3s
+node-token
+k3s.yaml
+
+# OS / Editor
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Go (phase1 legacy)
+phase1/tools/inventorygen

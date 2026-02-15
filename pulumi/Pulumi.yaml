@@ -1,0 +1,11 @@
+name: home-lab-infra
+runtime: go
+description: >
+  Infrastructure provisioning for a K3s home lab cluster.
+  Deploys Rocky Linux 9 VMs on Proxmox VE using cloud-init templates
+  and provisions a Linode edge node (Nanode + NodeBalancer) as a public
+  entry point with WireGuard tunnel back to the home network.
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: proxmox-go

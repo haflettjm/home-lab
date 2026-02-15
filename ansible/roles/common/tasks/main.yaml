@@ -1,0 +1,191 @@
+---
+# ==============================================================================
+# Common role - applied to ALL nodes
+# Handles base OS configuration, packages, security, and kernel tuning
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Hostname and timezone
+# ------------------------------------------------------------------------------
+- name: Set system hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+  become: true
+  tags:
+    - common
+    - hostname
+
+- name: Set system timezone
+  community.general.timezone:
+    name: "{{ timezone }}"
+  become: true
+  tags:
+    - common
+    - timezone
+
+# ------------------------------------------------------------------------------
+# Package management
+# ------------------------------------------------------------------------------
+- name: Update all packages to latest version
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+    update_cache: true
+  become: true
+  tags:
+    - common
+    - packages
+    - update
+
+- name: Install common packages
+  ansible.builtin.dnf:
+    name: "{{ common_packages }}"
+    state: present
+  become: true
+  tags:
+    - common
+    - packages
+
+# ------------------------------------------------------------------------------
+# Chrony (NTP) configuration
+# ------------------------------------------------------------------------------
+- name: Ensure chrony is enabled and started
+  ansible.builtin.systemd:
+    name: chronyd
+    state: started
+    enabled: true
+  become: true
+  tags:
+    - common
+    - chrony
+    - ntp
+
+# ------------------------------------------------------------------------------
+# Firewalld configuration
+# ------------------------------------------------------------------------------
+- name: Ensure firewalld is enabled and started
+  ansible.builtin.systemd:
+    name: firewalld
+    state: started
+    enabled: true
+  become: true
+  tags:
+    - common
+    - firewall
+
+# ------------------------------------------------------------------------------
+# Disable swap (required for Kubernetes)
+# ------------------------------------------------------------------------------
+- name: Disable swap immediately
+  ansible.builtin.command:
+    cmd: swapoff -a
+  changed_when: false
+  become: true
+  tags:
+    - common
+    - swap
+
+- name: Remove swap entries from /etc/fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^\s*[^#].*\s+swap\s+'
+    state: absent
+    backup: true
+  become: true
+  tags:
+    - common
+    - swap
+
+- name: Disable swap via systemd (zram if present)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  loop:
+    - swap.target
+  become: true
+  failed_when: false
+  tags:
+    - common
+    - swap
+
+# ------------------------------------------------------------------------------
+# SELinux configuration
+# ------------------------------------------------------------------------------
+- name: Set SELinux to permissive mode
+  ansible.posix.selinux:
+    policy: targeted
+    state: "{{ selinux_state }}"
+  become: true
+  tags:
+    - common
+    - selinux
+
+# ------------------------------------------------------------------------------
+# Kernel modules for Kubernetes networking
+# ------------------------------------------------------------------------------
+- name: Load required kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ k8s_kernel_modules }}"
+  become: true
+  tags:
+    - common
+    - kernel
+    - modules
+
+- name: Persist kernel modules across reboots
+  ansible.builtin.template:
+    src: modules-k8s.conf.j2
+    dest: /etc/modules-load.d/k8s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  tags:
+    - common
+    - kernel
+    - modules
+
+# ------------------------------------------------------------------------------
+# Sysctl parameters for Kubernetes networking
+# ------------------------------------------------------------------------------
+- name: Configure sysctl parameters for Kubernetes
+  ansible.builtin.template:
+    src: sysctl-k8s.conf.j2
+    dest: /etc/sysctl.d/99-k8s.conf
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Reload sysctl
+  tags:
+    - common
+    - sysctl
+    - networking
+
+- name: Apply sysctl parameters immediately
+  ansible.builtin.command:
+    cmd: sysctl --system
+  changed_when: false
+  become: true
+  tags:
+    - common
+    - sysctl
+    - networking
+
+# ------------------------------------------------------------------------------
+# SSH authorized keys
+# ------------------------------------------------------------------------------
+- name: Set up SSH authorized keys for admin user
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ ssh_authorized_keys }}"
+  when: ssh_authorized_keys | length > 0
+  tags:
+    - common
+    - ssh

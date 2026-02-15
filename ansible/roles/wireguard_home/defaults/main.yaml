@@ -1,0 +1,10 @@
+---
+wg_interface: wg0
+wg_port: 51820
+wg_tunnel_ip: "10.0.0.2/24"
+wg_peer_public_key: ""
+wg_peer_endpoint: ""
+wg_peer_allowed_ips: "10.0.0.1/32"
+wg_peer_keepalive: 25
+wg_forward_target: "192.168.1.200"
+wg_config_dir: /etc/wireguard

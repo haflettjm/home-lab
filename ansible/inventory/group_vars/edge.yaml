@@ -1,0 +1,34 @@
+---
+# Linode edge node (Nanode) — WireGuard + iptables forwarder
+# This node sits in Linode and tunnels public traffic back to the home lab.
+
+# WireGuard tunnel settings
+wg_interface: wg0
+wg_port: 51820
+wg_tunnel_ip: "10.0.0.1/24"
+
+# The home side's WireGuard public key (generated on the home endpoint).
+# TODO: Replace after generating keys on the home side.
+wg_peer_public_key: "REPLACE_WITH_HOME_WG_PUBLIC_KEY"
+
+# The home side's public IP or DDNS hostname + WireGuard port.
+# Since the home side is behind NAT, leave this empty — the home side
+# initiates the connection with PersistentKeepalive.
+wg_peer_endpoint: ""
+
+# Allowed IPs the home side can route through the tunnel.
+# 10.0.0.2/32 = the home tunnel IP
+# 192.168.1.0/24 = the home LAN (so we can reach K3s services)
+wg_peer_allowed_ips: "10.0.0.2/32"
+
+# Where to forward ports 80/443 through the tunnel.
+# This should be the home side's tunnel IP — traffic will be forwarded
+# there, and the home side will DNAT to the MetalLB ingress IP.
+wg_forward_target: "10.0.0.2"
+
+# Packages to install on the edge node
+edge_packages:
+  - wireguard-tools
+  - iptables-services
+  - curl
+  - htop

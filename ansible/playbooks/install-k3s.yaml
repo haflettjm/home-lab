@@ -1,0 +1,38 @@
+---
+# ==============================================================================
+# K3s cluster installation playbook
+#
+# Installs K3s server on control plane nodes first, then joins worker nodes
+# as agents. The server must be fully ready before agents attempt to join.
+#
+# Usage:
+#   ansible-playbook playbooks/install-k3s.yaml
+#   ansible-playbook playbooks/install-k3s.yaml --tags k3s_server
+#   ansible-playbook playbooks/install-k3s.yaml --tags k3s_agent
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Play 1: Install K3s server on control plane
+# ------------------------------------------------------------------------------
+- name: Install K3s server on control plane nodes
+  hosts: control_plane
+  become: true
+  gather_facts: true
+  serial: 1
+  roles:
+    - role: k3s_server
+      tags:
+        - k3s_server
+
+# ------------------------------------------------------------------------------
+# Play 2: Install K3s agent on worker nodes
+# ------------------------------------------------------------------------------
+- name: Install K3s agent on worker nodes
+  hosts: workers
+  become: true
+  gather_facts: true
+  serial: 2
+  roles:
+    - role: k3s_agent
+      tags:
+        - k3s_agent
